@@ -39,6 +39,7 @@
 ## ・goods_spec.csv
 ## ・goods_supp.csv
 ## ・genre_goods.csv
+## ・goods_img.csv
 ##    -本店に登録されている全商品のデータ。ecbeingよりダウンロード。
 ## ・sabun_YYYYMMDD.csv
 ##    -モール店に登録する商品データ。基本的には本店とモール店の差分になります。
@@ -112,6 +113,7 @@ my $input_goods_spec_file_name="goods_spec.csv";
 my $input_goods_supp_file_name="goods_supp.csv";
 my $input_genre_goods_file_name="genre_goods.csv";
 my $input_image_num_file_name="image_num.csv";
+my $input_goods_img_file_name="goods_img.csv";
 my $input_sabun_file_name="";
 #入力ファイル配置ディレクトリのオープン
 my $current_dir=Cwd::getcwd();
@@ -127,6 +129,7 @@ my $goods_spec_file_find=0;
 my $goods_supp_file_find=0;
 my $genre_goods_file_find=0;
 my $image_num_file_find=0;
+my $goods_img_file_find=0;
 my $sabun_file_find=0;
 my $sabun_file_multi=0;
 while (my $current_dir_file_name = readdir(INPUT_DIR)){
@@ -150,9 +153,14 @@ while (my $current_dir_file_name = readdir(INPUT_DIR)){
 		$genre_goods_file_find=1;
 		next;
 	}
-	# 画像情報のあるcsvを読み込んだらフラグを立てる
+	# 取得した画像情報のあるcsvを読み込んだらフラグを立てる
 	elsif($current_dir_file_name eq $input_image_num_file_name) {
 		$image_num_file_find=1;
+		next;
+	}
+	# 画像情報のあるcsvを読み込んだらフラグを立てる
+	elsif($current_dir_file_name eq $input_goods_img_file_name) {
+		$goods_img_file_find=1;
 		next;
 	}
 	# 差分ファイルがあれば
@@ -188,6 +196,10 @@ if (!$genre_goods_file_find) {
 if (!$image_num_file_find) {
 	#image_num.csvファイルがカレントディレクトリに存在しない
 	&output_log("ERROR!! Not exist $input_image_num_file_name.\n");
+}
+if (!$goods_img_file_find) {
+	#goods_img.csvファイルがカレントディレクトリに存在しない
+	&output_log("ERROR!! Not exist $input_goods_img_file_name.\n");
 }
 if (!$sabun_file_find) {
 	#sabun_YYYYMMDD.csvファイルがカレントディレクトリに存在しない
@@ -275,6 +287,7 @@ my $input_goods_spec_csv = Text::CSV_XS->new({ binary => 1 });
 my $input_goods_supp_csv = Text::CSV_XS->new({ binary => 1 });
 my $input_genre_goods_csv = Text::CSV_XS->new({ binary => 1 });
 my $input_image_num_csv = Text::CSV_XS->new({ binary => 1 });
+my $input_goods_img_csv = Text::CSV_XS->new({ binary => 1 });
 #入力ファイルのオープン
 $input_sabun_file_name="$input_dir"."/"."$input_sabun_file_name";
 my $input_sabun_file_disc;
@@ -308,6 +321,12 @@ if (!open $input_genre_goods_file_disc, "<", $input_genre_goods_file_name) {
 }	
 $input_image_num_file_name="$input_dir"."/"."$input_image_num_file_name";
 my $input_image_num_file_disc;
+if (!open $input_image_num_file_disc, "<", $input_image_num_file_name) {
+	&output_log("ERROR!!($!) $input_image_num_file_name open failed.");
+	exit 1;
+}	
+$input_goods_img_file_name="$input_dir"."/"."$input_goods_img_file_name";
+my $input_goods_img_file_disc;
 if (!open $input_image_num_file_disc, "<", $input_image_num_file_name) {
 	&output_log("ERROR!!($!) $input_image_num_file_name open failed.");
 	exit 1;
@@ -420,7 +439,7 @@ while(my $image_num_line = $input_image_num_csv->getline($input_image_num_file_d
 		# 商品コードが合致したらコードを保持する
 		if ($entry_goods_code eq $goods_code) {
 			if (!$is_find_goods_info) {
-				# goods.cvsの商品情報を保持(SKUのものは一つ目に合致した商品の情報を保持)
+				# goods.csvの商品情報を保持(SKUのものは一つ目に合致した商品の情報を保持)
 				push(@global_entry_goods_info,($entry_goods_code,@$goods_line[1],@$goods_line[2],@$goods_line[3],@$goods_line[5],@$goods_line[6], @$goods_line[11]));
 				$is_find_goods_info=1;
 			}				
@@ -824,6 +843,107 @@ sub add_rakuten_item_data {
 =pod
 	$output_item_csv->combine("") or die $output_item_csv->error_diag();
 =cut
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# あす楽配送管理番号
+	$output_item_csv->combine("1") or die $output_item_csv->error_diag();
+	#最後に改行を追加
+	print $output_item_file_disc $output_item_csv->string(), "\n";
+	return 0;
+}
+
+##############################
+## 楽天用reset_item.CSVファイルにデータを追加
+##############################
+sub add_rakuten_item_data {
+	# 各値をCSVファイルに書き出す
+	# コントロールカラム
+	$output_item_csv->combine("n") or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 商品管理番号
+	$output_item_csv->combine($global_entry_goods_info[0]) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 商品番号
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 全商品ディレクトリ(手動で入力する必要がある)
+	$output_item_csv->combine("") or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# タグID
+	my $tag_id="";
+	if (length($global_entry_goods_info[0]) == 7) {
+		# SKUの場合はサイズのtagidを出力
+		$tag_id=&create_r_tag_id();
+	}
+	$output_item_csv->combine($tag_id) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# PC用キャッチコピー
+	$output_item_csv->combine(&create_r_pccatch_copy()) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# モバイル用キャッチコピー
+	$output_item_csv->combine(&create_r_mbcatch_copy()) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 商品名
+	$output_item_csv->combine(&create_ry_goods_name()) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 販売価格
+	$output_item_csv->combine($global_entry_goods_info[3]) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 表示価格
+	$output_item_csv->combine("") or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 送料
+	my $output_postage_str="";
+	if ($global_entry_goods_info[3] >= 5000) {$output_postage_str="1";}
+	else {$output_postage_str="0";}
+	$output_item_csv->combine($output_postage_str) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 商品情報レイアウト
+	$output_item_csv->combine("5") or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# PC用商品説明文
+	$output_item_csv->combine(&create_r_pc_goods_spec()) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# モバイル用商品説明文
+	$output_item_csv->combine(&create_ry_mb_goods_spec()) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# PC用販売説明文
+	$output_item_csv->combine(&create_r_pc_goods_detail()) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 商品画像URL
+	$output_item_csv->combine(&create_r_goods_image_url()) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 在庫タイプ
+	my $output_stocktype_str="";
+	if (length($global_entry_goods_info[0]) == 7) {$output_stocktype_str="2";}
+	else {$output_stocktype_str="1";}
+	$output_item_csv->combine($output_stocktype_str) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 在庫数
+	my $output_stocknum_str="";
+	if (length($global_entry_goods_info[0]) == 7) {$output_stocknum_str="";}
+	else {$output_stocknum_str="0";}
+	$output_item_csv->combine($output_stocknum_str) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 在庫数表示
+	my $output_stockdisplay_str="";
+	if (length($global_entry_goods_info[0]) == 7) {$output_stockdisplay_str="";}
+	else {$output_stockdisplay_str="0";}
+	$output_item_csv->combine($output_stockdisplay_str) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 項目選択肢別在庫用横軸項目名
+	my $output_stockitem_str="";
+	if (length($global_entry_goods_info[0]) == 7) {$output_stockitem_str="サイズ";}
+	else {$output_stockitem_str="";}
+	Encode::from_to( $output_stockitem_str, 'utf8', 'shiftjis' );
+	$output_item_csv->combine($output_stockitem_str) or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 項目選択肢別在庫用縦軸項目名
+	$output_item_csv->combine("") or die $output_item_csv->error_diag();
+	print $output_item_file_disc $output_item_csv->string(), ",";
+	# 在庫あり時納期管理番号
+	my $output_stockcode_str="";
+	if (length($global_entry_goods_info[0]) == 7) {$output_stockcode_str="";}
+	else {$output_stockcode_str="14";}
+	$output_item_csv->combine($output_stockcode_str) or die $output_item_csv->error_diag();
 	print $output_item_file_disc $output_item_csv->string(), ",";
 	# あす楽配送管理番号
 	$output_item_csv->combine("1") or die $output_item_csv->error_diag();
