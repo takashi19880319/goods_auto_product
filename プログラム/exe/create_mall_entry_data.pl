@@ -1,6 +1,6 @@
 # create_mall_entry_data.pl
 # author:T.Hashiguchi
-# date:2013/6/21
+# date:2014/1/2
 
 #========== 改訂履歴 ==========
 # date:2012/11/11 modify
